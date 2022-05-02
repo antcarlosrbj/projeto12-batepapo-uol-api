@@ -2,9 +2,11 @@ import dayjs from 'dayjs';
 import express from 'express';
 import joi from 'joi';
 import { MongoClient } from "mongodb";
+import cors from 'cors';
 
 const app = express();
 app.use(express.json());
+app.use(cors());
 
 /* --------------------- CONECTANDO AO BANCO ---------------------- */
 
@@ -33,7 +35,7 @@ app.post("/participants", async (req, res) => {
     /* VERIFICAÇÃO - CONTER "NAME" E NÃO ESTAR VAZIO */
 
     const userSchemaEmpty = joi.object({
-        name: joi.string().required(),
+        name: joi.string().required()
     });
 
     const validationEmpty = userSchemaEmpty.validate(participant);
@@ -83,6 +85,48 @@ app.get("/participants", async (req, res) => {
         res.send(participants);
     } catch (error) {
         res.status(500).send('Erro ao buscar participantes no banco de dados')
+        console.log(error)
+    }
+});
+
+/* ----------------------- MESSAGES (POST) ------------------------ */
+
+app.post("/messages", async (req, res) => {
+    try {
+        const message = {
+            from: req.headers.user, 
+            to: req.body.to, 
+            text: req.body.text, 
+            type: req.body.type, 
+            time: dayjs(Date.now()).format('HH:mm:ss')
+        };
+
+        /* VERIFICAÇÃO */
+
+        const userSchemaMessage = joi.object({
+            from: joi.string().required(), 
+            to: joi.string().required(), 
+            text: joi.string().required(), 
+            type: joi.string().pattern(new RegExp('^(message|private_message)$')), 
+            time: joi.string().required()
+        });
+
+        const validationMessage = userSchemaMessage.validate(message);
+
+        await findParticipants();
+
+        if (validationMessage.error || !(participants.find(e => e.name === message.from))) {
+            res.sendStatus(422);
+            return
+        }
+
+        /* INSERINDO NO BANCO DE DADOS */
+
+        await db.collection("messages").insertOne(message);
+        res.sendStatus(201)
+
+    } catch (error) {
+        res.status(500).send('Erro ao adicionar mensagem no banco de dados')
         console.log(error)
     }
 });
