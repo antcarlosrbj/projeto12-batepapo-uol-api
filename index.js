@@ -57,18 +57,18 @@ app.post("/participants", async (req, res) => {
 
     try {
         await db.collection("participants").insertOne({
-            name: participant.name, 
+            name: participant.name,
             lastStatus: Date.now()
         });
 
         await db.collection("messages").insertOne({
-            from: participant.name, 
-            to: 'Todos', 
-            text: 'entra na sala...', 
-            type: 'status', 
+            from: participant.name,
+            to: 'Todos',
+            text: 'entra na sala...',
+            type: 'status',
             time: dayjs(Date.now()).format('HH:mm:ss')
         });
-        
+
         res.status(201).send("Participante adicionado com sucesso")
 
         /* CASO ERRO */
@@ -97,20 +97,20 @@ app.get("/participants", async (req, res) => {
 app.post("/messages", async (req, res) => {
     try {
         const message = {
-            from: req.headers.user, 
-            to: req.body.to, 
-            text: req.body.text, 
-            type: req.body.type, 
+            from: req.headers.user,
+            to: req.body.to,
+            text: req.body.text,
+            type: req.body.type,
             time: dayjs(Date.now()).format('HH:mm:ss')
         };
 
         /* VERIFICAÇÃO */
 
         const userSchemaMessage = joi.object({
-            from: joi.string().required(), 
-            to: joi.string().required(), 
-            text: joi.string().required(), 
-            type: joi.string().pattern(new RegExp('^(message|private_message)$')), 
+            from: joi.string().required(),
+            to: joi.string().required(),
+            text: joi.string().required(),
+            type: joi.string().pattern(new RegExp('^(message|private_message)$')),
             time: joi.string().required()
         });
 
@@ -156,13 +156,13 @@ app.get("/messages", async (req, res) => {
         } else {
             limit = Infinity;
         }
-        
+
         let messagesToSend = [];
         for (let i = 1, qty = 0; qty < limit && i <= messages.length; i++) {
             let message = messages[messages.length - i];
             if (!(
-                message.from !== req.headers.user && 
-                message.to !== req.headers.user && 
+                message.from !== req.headers.user &&
+                message.to !== req.headers.user &&
                 message.type === "private_message"
             )) {
                 messagesToSend.push(message);
@@ -172,7 +172,7 @@ app.get("/messages", async (req, res) => {
 
         /* ENVIANDO MENSAGENS */
 
-        res.send(messagesToSend);
+        res.send(messagesToSend.reverse());
 
         /* CASO ERRO */
 
@@ -188,20 +188,20 @@ app.post("/status", async (req, res) => {
     try {
         await mongoClient.connect()
         db = mongoClient.db("uol");
-        let participant = await db.collection("participants").find({name: req.headers.user}).toArray();
-        if(!participant.length) {
+        let participant = await db.collection("participants").find({ name: req.headers.user }).toArray();
+        if (!participant.length) {
             res.sendStatus(404);
             return;
         }
-        
+
         await db.collection("participants").updateOne(
             {
                 name: req.headers.user
             }, {
-                $set: {
-                    lastStatus: Date.now()
-                }
+            $set: {
+                lastStatus: Date.now()
             }
+        }
         );
 
         res.sendStatus(200);
@@ -211,6 +211,43 @@ app.post("/status", async (req, res) => {
         console.log(error)
     }
 });
+
+/* --------------------- REMOÇÃO DE INATIVOS ---------------------- */
+
+setInterval(async () => {
+    try {
+
+        /* LISTANDO INATIVOS */
+
+        await findParticipants();
+
+        const blackList = participants.filter(
+            participant => participant.lastStatus < Date.now() - 10000
+        )
+
+        /* EXCLUINDO INATIVOS E INSERINDO MENSAGEM */
+
+        await mongoClient.connect()
+        db = mongoClient.db("uol");
+
+        blackList.forEach(async (participant) => {
+            await db.collection("participants").deleteOne({name: participant.name});
+            await db.collection("messages").insertOne({
+                from: participant.name, 
+                to: 'Todos', 
+                text: 'sai da sala...', 
+                type: 'status', 
+                time: dayjs(Date.now()).format('HH:mm:ss')
+            });
+        });
+
+        /* CASO ERRO */
+
+    } catch (error) {
+        res.status(500).send('Erro ao buscar participantes no banco de dados')
+        console.log(error)
+    }
+}, 15000);
 
 /* ---------------------------------------------------------------- */
 
