@@ -72,7 +72,7 @@ app.post("/participants", async (req, res) => {
         res.status(201).send("Participante adicionado com sucesso")
 
         /* CASO ERRO */
-        
+
     } catch (error) {
         res.status(500).send('Erro ao adicionar participante no banco de dados')
         console.log(error)
@@ -178,6 +178,36 @@ app.get("/messages", async (req, res) => {
 
     } catch (error) {
         res.status(500).send('Erro ao buscar mensagens no banco de dados')
+        console.log(error)
+    }
+});
+
+/* ------------------------ STATUS (POST) ------------------------- */
+
+app.post("/status", async (req, res) => {
+    try {
+        await mongoClient.connect()
+        db = mongoClient.db("uol");
+        let participant = await db.collection("participants").find({name: req.headers.user}).toArray();
+        if(!participant.length) {
+            res.sendStatus(404);
+            return;
+        }
+        
+        await db.collection("participants").updateOne(
+            {
+                name: req.headers.user
+            }, {
+                $set: {
+                    lastStatus: Date.now()
+                }
+            }
+        );
+
+        res.sendStatus(200);
+
+    } catch (error) {
+        res.status(500).send('Erro ao acessar o banco de dados')
         console.log(error)
     }
 });
