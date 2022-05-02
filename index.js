@@ -75,6 +75,18 @@ app.post("/participants", async (req, res) => {
 
 });
 
+/* ---------------------- PARTICIPANTS (GET) ---------------------- */
+
+app.get("/participants", async (req, res) => {
+    try {
+        await findParticipants();
+        res.send(participants);
+    } catch (error) {
+        res.status(500).send('Erro ao buscar participantes no banco de dados')
+        console.log(error)
+    }
+});
+
 /* ---------------------------------------------------------------- */
 
 app.listen(5000);
