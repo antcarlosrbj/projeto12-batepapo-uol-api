@@ -70,6 +70,9 @@ app.post("/participants", async (req, res) => {
         });
         
         res.status(201).send("Participante adicionado com sucesso")
+
+        /* CASO ERRO */
+        
     } catch (error) {
         res.status(500).send('Erro ao adicionar participante no banco de dados')
         console.log(error)
@@ -125,8 +128,56 @@ app.post("/messages", async (req, res) => {
         await db.collection("messages").insertOne(message);
         res.sendStatus(201)
 
+        /* CASO ERRO */
+
     } catch (error) {
         res.status(500).send('Erro ao adicionar mensagem no banco de dados')
+        console.log(error)
+    }
+});
+
+/* ------------------------ MESSAGES (GET) ------------------------ */
+
+app.get("/messages", async (req, res) => {
+    try {
+
+        /* BUSCANDO MENSAGENS NO BANCO DE DADOS */
+
+        let messages;
+        await mongoClient.connect()
+        db = mongoClient.db("uol");
+        messages = await db.collection("messages").find({}).toArray();
+
+        /* FILTRANDO AS MENSAGENS A SEREM ENVIADAS */
+
+        let limit;
+        if (req.query.limit) {
+            limit = req.query.limit;
+        } else {
+            limit = Infinity;
+        }
+        
+        let messagesToSend = [];
+        for (let i = 1, qty = 0; qty < limit && i <= messages.length; i++) {
+            let message = messages[messages.length - i];
+            if (!(
+                message.from !== req.headers.user && 
+                message.to !== req.headers.user && 
+                message.type === "private_message"
+            )) {
+                messagesToSend.push(message);
+                qty++;
+            }
+        }
+
+        /* ENVIANDO MENSAGENS */
+
+        res.send(messagesToSend);
+
+        /* CASO ERRO */
+
+    } catch (error) {
+        res.status(500).send('Erro ao buscar mensagens no banco de dados')
         console.log(error)
     }
 });
