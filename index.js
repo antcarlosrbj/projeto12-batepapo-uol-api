@@ -1,7 +1,7 @@
 import dayjs from 'dayjs';
 import express from 'express';
 import joi from 'joi';
-import { MongoClient } from "mongodb";
+import { MongoClient, ObjectId } from "mongodb";
 import cors from 'cors';
 
 const app = express();
@@ -248,6 +248,67 @@ setInterval(async () => {
         console.log(error)
     }
 }, 15000);
+
+/* ----------------------- ALTERAR MENSAGEM ----------------------- */
+
+app.put("/messages/:id", async (req, res) => {
+    try {
+        const message = {
+            from: req.headers.user,
+            to: req.body.to,
+            text: req.body.text,
+            type: req.body.type,
+        };
+
+        /* VERIFICAÇÃO JOI */
+
+        const userSchemaMessage = joi.object({
+            from: joi.string().required(),
+            to: joi.string().required(),
+            text: joi.string().required(),
+            type: joi.string().pattern(new RegExp('^(message|private_message)$')),
+        });
+
+        const validationMessage = userSchemaMessage.validate(message);
+
+        if(validationMessage.error) {
+            res.sendStatus(422)
+            return
+        }
+
+        /* VERIFICAR MENSAGEM NO BANCO DE DADOS */
+
+        await mongoClient.connect();
+        db = mongoClient.db("uol");
+        const messageDatabase = await db.collection("messages").findOne({_id: new ObjectId(req.params.id)});
+
+        if(!messageDatabase) {
+            res.sendStatus(404)
+            return
+        }
+
+        /* VERIFICAR AUTOR DO PEDIDO */
+
+        await findParticipants();
+
+        if(!participants.find(participant => participant.name === message.from)) {
+            res.sendStatus(401)
+            return
+        }
+
+        /* ATUALIZAR MENSAGEM */
+
+        await db.collection("messages").updateOne({ 
+			_id: new ObjectId(req.params.id) 
+		}, { $set: message })
+
+        res.sendStatus(200);
+
+    } catch (error) {
+        res.sendStatus(500);
+        console.log(error);
+    }    
+});
 
 /* ---------------------------------------------------------------- */
 
