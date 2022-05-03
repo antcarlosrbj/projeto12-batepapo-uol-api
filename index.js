@@ -310,6 +310,43 @@ app.put("/messages/:id", async (req, res) => {
     }    
 });
 
+/* ----------------------- DELETAR MENSAGEM ----------------------- */
+
+app.delete("/messages/:id", async (req, res) => {
+    try {
+        
+        /* VERIFICAR MENSAGEM NO BANCO DE DADOS */
+
+        await mongoClient.connect();
+        db = mongoClient.db("uol");
+        const messageDatabase = await db.collection("messages").findOne({_id: new ObjectId(req.params.id)});
+
+        if(!messageDatabase) {
+            res.sendStatus(404)
+            return
+        }
+
+        /* VERIFICAR AUTOR DO PEDIDO */
+
+        await findParticipants();
+
+        if(!participants.find(participant => participant.name === req.headers.user)) {
+            res.sendStatus(401)
+            return
+        }
+
+        /* DELETAR MENSAGEM */
+
+        await db.collection("messages").deleteOne({ _id: new ObjectId(req.params.id) });
+
+        res.sendStatus(200);
+
+    } catch (error) {
+        res.sendStatus(500);
+        console.log(error);
+    }    
+});
+
 /* ---------------------------------------------------------------- */
 
 app.listen(5000);
